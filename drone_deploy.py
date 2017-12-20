@@ -24,14 +24,29 @@ class Solver(object):
         self.cam_matrix = cam_matrix
         self.dist_coef = dist_coef
         self.orb = orb
-        self.detector = cv2.ORB() if orb else cv2.SIFT()
-        # If ORB features are used, use BFMatcher. Instead, use FLANN matcher with SIFT features
-        self.matcher = (cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True) if orb
-                        else cv2.FlannBasedMatcher({ 'algorithm': 0, 'trees': 5 }, { 'checks': 50 }))
+        self.detector = self._get_detector(orb)
+        self.matcher = self._get_matcher(orb)
         # Pattern is 8.8 cm
         self.scale = 88.0 / len(self.pattern_image)
         # This is populated when poses are detected
         self.poses = []
+
+    def _get_detector(self, orb):
+        cv_version_major = cv2.__version__.split('.')[0]
+        if cv_version_major == '3':
+            return cv2.ORB_create() if orb else cv2.xfeatures2d.SIFT_create()
+        elif cv_version_major == '2':
+            return cv2.ORB() if orb else cv2.SIFT()
+        else:
+            raise Exception('Unknown OpenCV version: {}'.format(cv_version_major))
+
+    def _get_matcher(self, orb):
+        """If ORB features are used, use BFMatcher. Instead,
+        use FLANN matcher with SIFT features
+        """
+        if orb:
+            return cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        return cv2.FlannBasedMatcher({ 'algorithm': 0, 'trees': 5 }, { 'checks': 50 })
 
     def _match(self, pattern_descriptors, cam_descriptors):
         """Abstracted match interface"""
